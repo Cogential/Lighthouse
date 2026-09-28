@@ -273,7 +273,7 @@ void push_frame() {
 }
 
 /* Rename SDL_main to main for SDL compatibility */
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__ANDROID__)
 #define SDL_main main
 #endif
 

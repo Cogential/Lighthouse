@@ -178,7 +178,9 @@ add_compile_definitions(
 )
 
 # Find necessary libraries
-if (UNIX AND NOT APPLE)
+if (ANDROID)
+    set(USE_OPENGLES ON CACHE BOOL "" FORCE)
+elseif (UNIX AND NOT APPLE)
     find_package(OpenGL REQUIRED)
 endif()
 
@@ -252,6 +254,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         MACOSX_BUNDLE_INFO_PLIST ${IOS_DIR}/plist.in
         RESOURCE "${IMAGE_FILES};${STORYBOARD_FILE};${ICON_FILES}"
     )
+elseif (ANDROID)
+    add_library(${PROJECT_NAME} SHARED ${ALL_FILES})
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME main)
 else()
     add_executable(${PROJECT_NAME} ${ALL_FILES})
 endif()
@@ -438,11 +443,17 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU|Clang|AppleClang")
 	)
 endif()
 
+if(ANDROID)
+    include(cmake/android-deps.cmake)
+endif()
+
 if(USE_NETWORKING)
     if(MSVC)
         vcpkg_install_packages(sdl2-net)
     endif()
-    find_package(SDL2_net REQUIRED)
+    if(NOT ANDROID)
+        find_package(SDL2_net REQUIRED)
+    endif()
     include_directories(${SDL2_NET_INCLUDE_DIRS})
     target_compile_definitions(${PROJECT_NAME} PRIVATE USE_NETWORKING)
 endif()
@@ -480,8 +491,10 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
         ${DEVKITPRO}/portlibs/wiiu/include/
     )
 else()
-    find_package(Ogg REQUIRED)
-    find_package(Vorbis REQUIRED)
+    if(NOT ANDROID)
+        find_package(Ogg REQUIRED)
+        find_package(Vorbis REQUIRED)
+    endif()
  	set(ADDITIONAL_LIBRARY_DEPENDENCIES
         "$<$<BOOL:${USE_NETWORKING}>:SDL2_net::SDL2_net>"
         "Ogg::ogg"
@@ -489,7 +502,9 @@ else()
         "Vorbis::vorbisenc"
         "Vorbis::vorbisfile"
 	)
-    if(UNIX AND NOT APPLE)
+    if(ANDROID)
+        list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES dl log android)
+    elseif(UNIX AND NOT APPLE)
         list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES dl)
     endif()
 endif()
@@ -698,7 +713,9 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
           >
       )
   else()
-      if(NOT DEFINED CPU_OPTION)
+      if(ANDROID)
+        set(CPU_OPTION -Wno-error=format-security)
+      elseif(NOT DEFINED CPU_OPTION)
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
           set(CPU_OPTION -msse2 -mfpmath=sse)
         elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
@@ -738,7 +755,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
   endif()
 endif()
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch" AND NOT ANDROID)
 include(ExternalProject)
 ExternalProject_Add(TorchExternal
 	PREFIX TorchExternal

@@ -16,7 +16,7 @@
 #include <windows.h>
 #include <dbghelp.h>
 #pragma comment(lib, "dbghelp.lib")
-#elif defined(__has_include)
+#elif defined(__has_include) && !defined(__ANDROID__)
 #if __has_include(<execinfo.h>)
 #define LH_HAVE_EXECINFO 1
 #include <execinfo.h>

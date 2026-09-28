@@ -32,14 +32,22 @@ using nlohmann::json;
 using nlohmann::ordered_json;
 namespace fs = std::filesystem;
 static bool mLoaded = false;
-const std::string savesFolderPathString(Ship::Context::GetPathRelativeToAppDirectory("saves"));
-const std::filesystem::path savesFolderPath(savesFolderPathString);
+// Resolved on first use: on Android the app directory comes from SDL's JNI bridge, which isn't
+// available yet while static initializers run.
+static const std::string& savesFolderPathString() {
+    static const std::string path(Ship::Context::GetPathRelativeToAppDirectory("saves"));
+    return path;
+}
+static const std::filesystem::path& savesFolderPath() {
+    static const std::filesystem::path path(savesFolderPathString());
+    return path;
+}
 
 #define CVAR_NAME_BOTTLES_BONUS CVAR_ENHANCEMENT("Saving.PersistBottlesBonus")
 
 std::string SaveManager_GetSavePath(const std::string& filename) {
     std::string romName = GetActiveRomhackBasename();
-    std::string dir = romName.empty() ? savesFolderPathString
+    std::string dir = romName.empty() ? savesFolderPathString()
                                       : Ship::Context::GetPathRelativeToAppDirectory("saves/~romhacks/" + romName);
     std::error_code ec;
     fs::create_directories(dir, ec);
@@ -799,9 +807,9 @@ static void SaveGlobalData() {
 }
 
 void SaveManager_MoveInvalidSaveFile(const std::filesystem::path& fileName, const std::string& message) {
-    const std::filesystem::path filePath = savesFolderPath / fileName;
+    const std::filesystem::path filePath = savesFolderPath() / fileName;
     const std::filesystem::path backupFilePath =
-        savesFolderPath / (fileName.stem().string() + "_invalid_" + std::to_string(std::time(nullptr)) + ".json");
+        savesFolderPath() / (fileName.stem().string() + "_invalid_" + std::to_string(std::time(nullptr)) + ".json");
 
     try {
         if (std::filesystem::exists(filePath)) {

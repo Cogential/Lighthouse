@@ -318,7 +318,11 @@ void LighthouseMenu::AddMenuSettings() {
         .Options(ComboboxOptions()
                      .ComboMap(imguiScaleOptions)
                      .Tooltip("Changes the scaling of the ImGui menu elements.")
+#ifdef __ANDROID__
+                     .DefaultIndex(3)
+#else
                      .DefaultIndex(1)
+#endif
                      .ComponentAlignment(ComponentAlignments::Right)
                      .LabelPosition(LabelPositions::Far));
     //.Callback([](WidgetInfo& info) { GameEngine::Instance->ScaleImGui(); });

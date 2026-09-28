@@ -66,7 +66,14 @@
 #define gVIsPerFrame 2 // 30 Hz
 
 const float imguiScaleOptionToValue[4] = { 0.75f, 1.0f, 1.5f, 2.0f };
+#ifdef __ANDROID__
+// libultraship pre-scales ImGui 2x on Android; default to the 2.0x option so menus stay touch-sized.
+const uint32_t defaultImGuiScale = 3;
+const float baseImGuiScale = 2.0f;
+#else
 const uint32_t defaultImGuiScale = 1;
+const float baseImGuiScale = 1.0f;
+#endif
 
 // Engine globals
 
@@ -91,7 +98,7 @@ bool portArchiveVersionMatch = false;
 std::string assets_path;
 
 int32_t previousImGuiScaleIndex = -1;
-float previousImGuiScale = defaultImGuiScale;
+float previousImGuiScale = baseImGuiScale;
 
 namespace fs = std::filesystem;
 
@@ -170,7 +177,7 @@ GameEngine::GameEngine() {
     }
 
     previousImGuiScaleIndex = -1;
-    previousImGuiScale = defaultImGuiScale;
+    previousImGuiScale = baseImGuiScale;
     ScaleImGui();
 }
 
