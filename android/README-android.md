@@ -27,7 +27,19 @@ asks for your Banjo-Kazooie (USA) ROM (.z64/.n64/.v64). The ROM is copied there 
 `baserom.us.z64`, then Lighthouse's own extractor builds `bk.o2r` on-device.
 Alternatively, copy an existing `bk.o2r` from a desktop install into that folder over USB.
 
-A gamepad is recommended; there is no on-screen touch controller.
+### Controls
+
+- **Bluetooth/USB controllers** work out of the box.
+- **Touch controls:** an on-screen N64 pad (floating analog stick, A/B, C buttons, Z, L, R,
+  Start) feeding an SDL virtual gamepad, so controller remapping applies to it too.
+  - Tap the small button in the bottom-right corner to hide/show it.
+  - Hold that button to edit the layout: drag to move, hold a control and pinch with a second
+    finger to resize, and use the slider to change opacity. Tap the check mark to save, hold it
+    to reset.
+  - The controls step aside while a menu or popup is open.
+- **Back button/gesture** opens and closes the Lighthouse menu (settings, enhancements, cheats…).
+- The game runs fullscreen with the status and navigation bars hidden; swipe in from an edge
+  to show them.
 
 ## Source changes vs upstream
 
@@ -40,6 +52,10 @@ A gamepad is recommended; there is no on-screen touch controller.
   first use instead of in static initializers (on Android they need SDL's JNI bridge, which isn't
   up yet when `libmain.so` loads — this crashed at startup).
 - `FilePicker.h`: Android uses the in-game ImGui file browser (no desktop file dialog exists).
+- `src/port/Android/TouchControls.cpp`: JNI bridge from the touch overlay to an SDL virtual
+  gamepad.
+- libultraship fork: Android's back key (`ImGuiKey_AppBack`) toggles the menu like Escape, and
+  the SDL window is always fullscreen on Android so the system bars stay hidden.
 - `Engine.cpp` / `LighthouseMenuSettings.cpp`: default menu scale 2.0x on Android, matching
   libultraship's Android pre-scale (otherwise Lighthouse reset menus to tiny 1.0x).
 
