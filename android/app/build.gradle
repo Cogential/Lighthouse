@@ -6,6 +6,15 @@ plugins {
 // Populate with scripts/stage-assets.sh (lighthouse.o2r, config.yml, assets/, gamecontrollerdb.txt).
 def gameDataDir = file("$rootDir/game-data")
 
+// Release signing key, kept outside the repo. Override the location with
+// -PlighthouseSigningProperties=/path/to/file. Without it, release builds use the debug key.
+def signingPropsFile = file(project.findProperty('lighthouseSigningProperties') ?:
+        "${System.getProperty('user.home')}/.android-keys/lighthouse-release.properties")
+def signingProps = new Properties()
+if (signingPropsFile.exists()) {
+    signingPropsFile.withInputStream { signingProps.load(it) }
+}
+
 android {
     namespace 'com.cogent.lighthouse'
     compileSdk 35
@@ -30,11 +39,21 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            if (signingPropsFile.exists()) {
+                storeFile file(signingProps['storeFile'])
+                storePassword signingProps['storePassword']
+                keyAlias signingProps['keyAlias']
+                keyPassword signingProps['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
-            // Sign with the debug key so the APK installs without extra setup.
-            signingConfig signingConfigs.debug
+            signingConfig signingPropsFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
 
