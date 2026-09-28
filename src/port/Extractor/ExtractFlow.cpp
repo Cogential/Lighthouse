@@ -492,7 +492,8 @@ void GameEngine::RunExtract(int argc, char* argv[]) {
                     case PS_FIRST: {
                         if (args.empty()) {
                             std::string baserom = Ship::Context::GetPathRelativeToAppDirectory("baserom.us.z64");
-                            if (std::filesystem::exists(baserom) && extract.LoadRomFromPath(baserom)) {
+                            if (std::filesystem::exists(baserom) && extract.LoadRomFromPath(baserom) &&
+                                extract.CheckRomSupported().empty()) {
                                 extracting = true;
                                 extractStarted = true;
                                 file = extract.GetRomPath();

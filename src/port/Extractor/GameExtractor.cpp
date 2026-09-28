@@ -17,6 +17,7 @@
 #include "port/FilePicker.h"
 #include "spdlog/spdlog.h"
 #include <port/Engine.h>
+#include "port/UI/LighthouseGui.hpp"
 
 #ifdef unix
 #include <dirent.h>
@@ -44,6 +45,24 @@ std::unordered_map<std::string, std::string> mGameList = {
     { "bb359a75941df74bf7290212c89fbc6e2c5601fe", "Banjo-Kazooie (PAL)" },
     { "90726d7e7cd5bf6cdfd38f45c9acbf4d45bd9fd8", "Banjo-Kazooie (Japan)" },
 };
+
+// .v64 dumps are 16-bit byte-swapped and .n64 dumps are 32-bit little-endian; the extractor
+// expects big-endian (.z64) data.
+static void NormalizeRomByteOrder(std::vector<uint8_t>& rom) {
+    if (rom.size() < 4 || rom.size() % 4 != 0) {
+        return;
+    }
+    if (rom[0] == 0x37 && rom[1] == 0x80 && rom[2] == 0x40 && rom[3] == 0x12) {
+        for (size_t i = 0; i < rom.size(); i += 2) {
+            std::swap(rom[i], rom[i + 1]);
+        }
+    } else if (rom[0] == 0x40 && rom[1] == 0x12 && rom[2] == 0x37 && rom[3] == 0x80) {
+        for (size_t i = 0; i < rom.size(); i += 4) {
+            std::swap(rom[i], rom[i + 3]);
+            std::swap(rom[i + 1], rom[i + 2]);
+        }
+    }
+}
 
 bool GameExtractor::RunStandalone(std::string rom) {
     // Store both path and already-read data
@@ -110,6 +129,7 @@ bool GameExtractor::LoadRomFromPath(const std::string& romPath) {
 
     std::vector<uint8_t> romData(std::istreambuf_iterator<char>(inFile), {});
     inFile.close();
+    NormalizeRomByteOrder(romData);
 
     this->mGamePath = romPath;
     this->mGameData = std::move(romData);
@@ -176,6 +196,35 @@ void GameExtractor::GetRoms(std::vector<std::string>& roms) {
         }
     }
 #endif
+}
+
+std::string GameExtractor::CheckRomSupported() const {
+    const std::vector<uint8_t>& rom = this->mGameData;
+    if (rom.size() < 0x40 || rom[0] != 0x80 || rom[1] != 0x37 || rom[2] != 0x12 || rom[3] != 0x40) {
+        return "That file isn't an N64 ROM.";
+    }
+    if (mGameList.count(Companion::CalculateHash(rom)) > 0) {
+        return "";
+    }
+    const BK64::RomhackKind kind = BK64::ClassifyRomhack(rom);
+    if (kind == BK64::RomhackKind::BBRomhack || kind == BK64::RomhackKind::CustomBuild) {
+        return "";
+    }
+
+    // Internal name lives at 0x20, space-padded to 20 bytes.
+    std::string name(reinterpret_cast<const char*>(rom.data() + 0x20), 20);
+    name.erase(name.find_last_not_of(std::string(" \0", 2)) + 1);
+    const bool looksLikeBanjo = rom[0x3B] == 'N' && rom[0x3C] == 'B' && rom[0x3D] == 'K';
+
+    std::string reason;
+    if (looksLikeBanjo) {
+        reason = "This Banjo-Kazooie ROM doesn't match any supported version.\n"
+                 "It may be modified or a bad dump.";
+    } else {
+        reason = "\"" + (name.empty() ? std::string("This ROM") : name) + "\" isn't Banjo-Kazooie.";
+    }
+    return reason + "\n\nSupported: Banjo-Kazooie USA (v1.0 or v1.1), PAL or Japan,\n"
+                    "and Banjo's Backpack romhacks.";
 }
 
 std::optional<std::string> GameExtractor::ValidateChecksum() const {
@@ -395,6 +444,10 @@ std::optional<std::string> GameExtractor::ValidateChecksum() const {
     return std::nullopt;
 }
 
+std::string GameExtractor::CheckRomSupported() const {
+    return "";
+}
+
 bool GameExtractor::LoadRomFromPath(const std::string& romPath) {
     return false;
 }
@@ -420,7 +473,16 @@ void GameExtractor::SelectGameFromUI(std::function<void(bool)> onComplete) {
     req.Filters = { { "N64 ROMs (.z64, .n64, .v64)", { "*.z64", "*.n64", "*.v64" } }, { "All files", { "*" } } };
     Lighthouse::PickFile(std::move(req),
                          [this, onComplete = std::move(onComplete)](std::optional<std::filesystem::path> path) {
-                             const bool ok = path.has_value() && LoadRomFromPath(path->string());
+                             bool ok = path.has_value() && LoadRomFromPath(path->string());
+                             if (ok) {
+                                 const std::string problem = CheckRomSupported();
+                                 if (!problem.empty()) {
+                                     SPDLOG_WARN("Rejected ROM {}: {}", path->string(), problem);
+                                     LighthouseGui::RegisterPopup("Wrong ROM", problem);
+                                     mGameData.clear();
+                                     ok = false;
+                                 }
+                             }
                              if (onComplete) {
                                  onComplete(ok);
                              }

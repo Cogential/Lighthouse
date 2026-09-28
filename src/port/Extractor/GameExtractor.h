@@ -12,6 +12,9 @@ class GameExtractor {
 public:
     static bool GenAssetFile();
     std::optional<std::string> ValidateChecksum() const;
+    // Empty when the loaded ROM is a supported Banjo-Kazooie dump or romhack; otherwise a
+    // user-facing reason it was rejected.
+    std::string CheckRomSupported() const;
     bool RunStandalone(std::string rom);
     bool LoadRomFromPath(const std::string& romPath);
     // Open the file picker for an N64 ROM, then load the choice into this extractor. onComplete
