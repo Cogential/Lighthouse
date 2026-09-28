@@ -1,0 +1,63 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Game data that ships inside the APK and is unpacked to the app's files dir on first run.
+// Populate with scripts/stage-assets.sh (lighthouse.o2r, config.yml, assets/, gamecontrollerdb.txt).
+def gameDataDir = file("$rootDir/game-data")
+
+android {
+    namespace 'com.cogent.lighthouse'
+    compileSdk 35
+    ndkVersion '28.2.13676358'
+
+    defaultConfig {
+        applicationId 'com.cogent.lighthouse'
+        minSdk 26
+        targetSdk 35
+        versionCode 110
+        versionName '1.1.0'
+
+        ndk {
+            // Override for emulator testing: ./gradlew assembleRelease -Pabis=x86_64
+            abiFilters(*(project.findProperty('abis') ?: 'arm64-v8a').split(','))
+        }
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_shared', '-DCMAKE_BUILD_TYPE=Release'
+                targets 'Lighthouse'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Sign with the debug key so the APK installs without extra setup.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('../../CMakeLists.txt')
+            version '3.31.6'
+        }
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = [gameDataDir]
+        }
+    }
+
+    androidResources {
+        // .o2r is already a zip; storing it avoids a slow recompress and allows streaming copy
+        noCompress 'o2r'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
