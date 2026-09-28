@@ -8,11 +8,44 @@ def gameDataDir = file("$rootDir/game-data")
 
 // Release signing key, kept outside the repo. Override the location with
 // -PlighthouseSigningProperties=/path/to/file. Without it, release builds use the debug key.
-def signingPropsFile = file(project.findProperty('lighthouseSigningProperties') ?:
-        "${System.getProperty('user.home')}/.android-keys/lighthouse-release.properties")
-def signingProps = new Properties()
-if (signingPropsFile.exists()) {
-    signingPropsFile.withInputStream { signingProps.load(it) }
+def expandHome = { String path -> path.startsWith('~/') ? System.getProperty('user.home') + path.substring(1) : path }
+def signingOverride = project.findProperty('lighthouseSigningProperties')
+File signingPropsFile
+if (signingOverride) {
+    // Relative paths are relative to the android/ directory (the Gradle root), not to this module.
+    signingPropsFile = new File(expandHome(signingOverride.toString()))
+    if (!signingPropsFile.absolute) {
+        signingPropsFile = new File(rootProject.projectDir, signingPropsFile.path)
+    }
+    if (!signingPropsFile.isFile()) {
+        throw new GradleException("lighthouseSigningProperties points to ${signingPropsFile}, which doesn't exist")
+    }
+} else {
+    signingPropsFile = new File("${System.getProperty('user.home')}/.android-keys/lighthouse-release.properties")
+    if (!signingPropsFile.isFile()) {
+        signingPropsFile = null
+        logger.info('No release signing properties found; release builds use the debug key')
+    }
+}
+
+def releaseSigning = null
+if (signingPropsFile != null) {
+    def props = new Properties()
+    signingPropsFile.withInputStream { props.load(it) }
+    def missing = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].findAll { !props[it] }
+    if (!missing.isEmpty()) {
+        throw new GradleException("${signingPropsFile} is missing: ${missing.join(', ')}")
+    }
+    // A relative keystore path is relative to the properties file.
+    def keystore = new File(expandHome(props['storeFile']))
+    if (!keystore.absolute) {
+        keystore = new File(signingPropsFile.parentFile, keystore.path)
+    }
+    if (!keystore.isFile()) {
+        throw new GradleException("Keystore ${keystore} (from ${signingPropsFile}) doesn't exist")
+    }
+    releaseSigning = [storeFile: keystore, storePassword: props['storePassword'], keyAlias: props['keyAlias'],
+                      keyPassword: props['keyPassword']]
 }
 
 android {
@@ -41,11 +74,11 @@ android {
 
     signingConfigs {
         release {
-            if (signingPropsFile.exists()) {
-                storeFile file(signingProps['storeFile'])
-                storePassword signingProps['storePassword']
-                keyAlias signingProps['keyAlias']
-                keyPassword signingProps['keyPassword']
+            if (releaseSigning != null) {
+                storeFile releaseSigning.storeFile
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
             }
         }
     }
@@ -53,7 +86,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingPropsFile.exists() ? signingConfigs.release : signingConfigs.debug
+            signingConfig releaseSigning != null ? signingConfigs.release : signingConfigs.debug
         }
     }
 

@@ -21,9 +21,11 @@ Requirements: JDK 17, Android SDK with `platforms;android-35`, `build-tools;35.0
    Output: `app/build/outputs/apk/release/app-release.apk`.
 
    Signing: if `~/.android-keys/lighthouse-release.properties` exists (or a path passed with
-   `-PlighthouseSigningProperties=...`), the release build is signed with that key. It holds
-   `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. Without it, the debug key is used,
-   and that APK can't update an install signed with the release key.
+   `-PlighthouseSigningProperties=...`, absolute or relative to `android/`), the release build is signed with that key. It holds
+   `storeFile` (absolute, `~/`, or relative to the properties file), `storePassword`, `keyAlias`
+   and `keyPassword`. An explicit path that doesn't exist, a missing entry or a missing keystore
+   stops the build. With no properties file at all, the debug key is used, and that APK can't
+   update an install signed with the release key.
 
 ## Using it
 
