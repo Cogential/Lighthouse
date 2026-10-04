@@ -272,6 +272,49 @@ void push_frame() {
     }
 }
 
+#ifdef LIGHTHOUSE_SELF_CONTAINED
+// Self-contained Linux packages (the Steam Frame build): the install folder may be replaced on every
+// update, so keep data and saves in ~/.local/share/Lighthouse, seeded from what ships next to the
+// executable (port data, plus a ROM in private builds).
+static void PrepareSelfContainedHome() {
+    const char* existing = std::getenv("SHIP_HOME");
+    if (existing != nullptr && existing[0] != '\0') {
+        return;
+    }
+    std::error_code ec;
+    const std::filesystem::path exeDir = std::filesystem::read_symlink("/proc/self/exe", ec).parent_path();
+    if (ec) {
+        return;
+    }
+    std::filesystem::path home;
+    if (const char* xdg = std::getenv("XDG_DATA_HOME"); xdg != nullptr && xdg[0] == '/') {
+        home = xdg;
+    } else if (const char* h = std::getenv("HOME"); h != nullptr && h[0] != '\0') {
+        home = std::filesystem::path(h) / ".local/share";
+    } else {
+        return;
+    }
+    home /= "Lighthouse";
+    std::filesystem::create_directories(home, ec);
+    if (ec) {
+        return;
+    }
+    const auto update = std::filesystem::copy_options::update_existing | std::filesystem::copy_options::recursive;
+    for (const char* name : { "lighthouse.o2r", "config.yml", "gamecontrollerdb.txt", "assets" }) {
+        if (std::filesystem::exists(exeDir / name)) {
+            std::filesystem::copy(exeDir / name, home / name, update, ec);
+        }
+    }
+    // Hand a bundled ROM to the extractor until it has built bk.o2r.
+    const std::filesystem::path rom = exeDir / "baserom.us.z64";
+    if (std::filesystem::exists(rom) && !std::filesystem::exists(home / "bk.o2r") &&
+        !std::filesystem::exists(home / "baserom.us.z64")) {
+        std::filesystem::copy_file(rom, home / "baserom.us.z64", ec);
+    }
+    setenv("SHIP_HOME", home.c_str(), 1);
+}
+#endif
+
 /* Rename SDL_main to main for SDL compatibility */
 #if defined(__GNUC__) && !defined(__ANDROID__)
 #define SDL_main main
@@ -280,6 +323,10 @@ void push_frame() {
 int SDL_main(int argc, char* argv[]) {
 #ifdef _WIN32
     timeBeginPeriod(1);
+#endif
+
+#ifdef LIGHTHOUSE_SELF_CONTAINED
+    PrepareSelfContainedHome();
 #endif
 
     // Anchor relative paths to the executable instead of cwd

@@ -11,6 +11,7 @@
 #include <spdlog/fmt/fmt.h>
 #include "variables.h"
 #include <tuple>
+#include <algorithm>
 
 std::vector<ImVec2> windowTypeSizes = { {} };
 
@@ -839,6 +840,11 @@ void Menu::DrawElement() {
     float sidebarWidth = 245 - style.ItemSpacing.x;
     if (menuSize.x > 1600) {
         sidebarWidth = menuSize.x * 0.15f;
+    }
+    // ...and never narrower than the longest entry, which large menu scales would otherwise clip.
+    for (auto& sidebarLabel : menuEntries.at(headerIndex).sidebarOrder) {
+        sidebarWidth = std::max(sidebarWidth, ImGui::CalcTextSize(sidebarLabel.c_str(), nullptr, true).x +
+                                                  style.FramePadding.x * 2 + style.WindowPadding.x * 2);
     }
 
     const char* sidebarCvar = menuEntries.at(headerIndex).sidebarCvar;

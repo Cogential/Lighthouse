@@ -458,6 +458,10 @@ if(USE_NETWORKING)
     target_compile_definitions(${PROJECT_NAME} PRIVATE USE_NETWORKING)
 endif()
 
+if(LIGHTHOUSE_SELF_CONTAINED)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE LIGHTHOUSE_SELF_CONTAINED)
+endif()
+
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     find_package(Ogg CONFIG REQUIRED)
     link_libraries(Ogg::ogg)
@@ -510,6 +514,8 @@ else()
 endif()
 
 option(USE_STANDALONE "Build as a standalone executable" OFF)
+# Linux packages that carry their own data and keep saves in ~/.local/share/Lighthouse (Steam Frame).
+option(LIGHTHOUSE_SELF_CONTAINED "Seed ~/.local/share/Lighthouse from the files next to the executable" OFF)
 option(BUILD_STORMLIB "Build with StormLib support" OFF)
 
 option(BUILD_BK64 "Build with Banjo-Kazooie support" ON)
@@ -755,7 +761,8 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
   endif()
 endif()
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch" AND NOT ANDROID)
+# Torch runs on the build machine; a cross build (e.g. ARM64 Linux) ships prebuilt o2r files instead.
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch" AND NOT ANDROID AND NOT CMAKE_CROSSCOMPILING)
 include(ExternalProject)
 ExternalProject_Add(TorchExternal
 	PREFIX TorchExternal

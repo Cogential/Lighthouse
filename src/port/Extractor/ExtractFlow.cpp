@@ -447,6 +447,14 @@ void GameEngine::RunExtract(int argc, char* argv[]) {
                     case PS_FILE_CHECK: {
                         const bool romO2RExists = AnyRomArchiveExists();
 
+#ifdef LIGHTHOUSE_SELF_CONTAINED
+                        // The package brought the ROM along: extract it without asking.
+                        if (!romO2RExists && std::filesystem::exists(
+                                                 Ship::Context::GetPathRelativeToAppDirectory("baserom.us.z64"))) {
+                            promptStep = PS_FIRST;
+                            continue;
+                        }
+#endif
                         if (!romO2RExists) {
                             LighthouseGui::RegisterPopup(
                                 "No O2R Files", "No O2R files found. Generate one now?", "Yes", "No",

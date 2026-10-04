@@ -63,9 +63,13 @@ public class SetupActivity extends Activity {
                 mMain.post(() -> Toast.makeText(this, "Failed to unpack game data: " + e.getMessage(),
                         Toast.LENGTH_LONG).show());
             }
-            final boolean haveRom = haveRomOrArchive();
+            boolean haveRom = haveRomOrArchive();
+            if (!haveRom && importBundledRom()) {
+                haveRom = haveRomOrArchive();
+            }
+            final boolean romReady = haveRom;
             mMain.post(() -> {
-                if (haveRom) {
+                if (romReady) {
                     launchGame();
                 } else {
                     promptForRom();
@@ -130,6 +134,22 @@ public class SetupActivity extends Activity {
         int n;
         while ((n = in.read(buf)) > 0) {
             out.write(buf, 0, n);
+        }
+    }
+
+    /**
+     * Private builds can bundle the ROM (build.gradle's lighthouseRomDir) for devices without a
+     * document picker. Copies it into the game folder; returns false when the APK has none.
+     */
+    private boolean importBundledRom() {
+        File out = new File(mGameDir, ROM_NAME);
+        try (InputStream in = getAssets().open(ROM_NAME); OutputStream os = new FileOutputStream(out)) {
+            copy(in, os);
+            Log.i(TAG, "Imported bundled ROM");
+            return true;
+        } catch (IOException e) {
+            out.delete();
+            return false;
         }
     }
 

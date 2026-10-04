@@ -68,12 +68,20 @@
 const float imguiScaleOptionToValue[4] = { 0.75f, 1.0f, 1.5f, 2.0f };
 #ifdef __ANDROID__
 // libultraship pre-scales ImGui 2x on Android; default to the 2.0x option so menus stay touch-sized.
-const uint32_t defaultImGuiScale = 3;
+// Steam Frame builds (LIGHTHOUSE_FRAME, set by LighthouseActivity) are pointed at, not touched: 1.5x.
 const float baseImGuiScale = 2.0f;
 #else
-const uint32_t defaultImGuiScale = 1;
 const float baseImGuiScale = 1.0f;
 #endif
+
+uint32_t GameEngine::DefaultImGuiScale() {
+#ifdef __ANDROID__
+    static const bool frame = SDL_getenv("LIGHTHOUSE_FRAME") != nullptr;
+    return frame ? 2 : 3;
+#else
+    return 1;
+#endif
+}
 
 // Engine globals
 
@@ -324,6 +332,9 @@ void GameEngine::FinishInit() {
     // Instance->LoadPlayerAnims();
 #if defined(__SWITCH__) || defined(__WIIU__)
     CVarRegisterInteger(CVAR_IMGUI_CONTROLLER_NAV, 1); // always enable controller nav on switch/wii u
+#elif defined(LIGHTHOUSE_SELF_CONTAINED)
+    // Steam Frame: there's no keyboard, so Back/View has to be able to open the menu out of the box.
+    CVarRegisterInteger(CVAR_IMGUI_CONTROLLER_NAV, 1);
 #endif
 }
 
@@ -365,7 +376,7 @@ ImFont* GameEngine::CreateFontWithSize(float size, std::string fontPath) {
 }
 
 void GameEngine::ScaleImGui() {
-    int32_t imGuiScaleIndex = CVarGetInteger("gSettings.ImGuiScale", defaultImGuiScale);
+    int32_t imGuiScaleIndex = CVarGetInteger("gSettings.ImGuiScale", DefaultImGuiScale());
     if (imGuiScaleIndex == previousImGuiScaleIndex) {
         return;
     }

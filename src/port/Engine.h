@@ -29,6 +29,8 @@ typedef enum {
 class GameEngine {
 public:
     static GameEngine* Instance;
+    // Index into the ImGui Menu Scaling options used until the player picks one.
+    static uint32_t DefaultImGuiScale();
 
     ImFont* fontStandard;
     ImFont* fontStandardLarger;

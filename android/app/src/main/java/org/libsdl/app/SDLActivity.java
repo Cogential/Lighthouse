@@ -1139,7 +1139,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
      */
     public static boolean isAndroidTV() {
         UiModeManager uiModeManager = (UiModeManager) getContext().getSystemService(UI_MODE_SERVICE);
-        if (uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION) {
+        if (uiModeManager != null && uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION) {
             return true;
         }
         if (Build.MANUFACTURER.equals("MINIX") && Build.MODEL.equals("NEO-U1")) {
@@ -2084,14 +2084,20 @@ class SDLClipboardHandler implements
 
     SDLClipboardHandler() {
        mClipMgr = (ClipboardManager) SDL.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-       mClipMgr.addPrimaryClipChangedListener(this);
+       // Steam Frame's Lepton container publishes no clipboard service.
+       if (mClipMgr != null) {
+           mClipMgr.addPrimaryClipChangedListener(this);
+       }
     }
 
     public boolean clipboardHasText() {
-       return mClipMgr.hasPrimaryClip();
+       return mClipMgr != null && mClipMgr.hasPrimaryClip();
     }
 
     public String clipboardGetText() {
+        if (mClipMgr == null) {
+            return null;
+        }
         ClipData clip = mClipMgr.getPrimaryClip();
         if (clip != null) {
             ClipData.Item item = clip.getItemAt(0);
@@ -2106,6 +2112,9 @@ class SDLClipboardHandler implements
     }
 
     public void clipboardSetText(String string) {
+       if (mClipMgr == null) {
+           return;
+       }
        mClipMgr.removePrimaryClipChangedListener(this);
        ClipData clip = ClipData.newPlainText(null, string);
        mClipMgr.setPrimaryClip(clip);

@@ -6,6 +6,18 @@ plugins {
 // Populate with scripts/stage-assets.sh (lighthouse.o2r, config.yml, assets/, gamecontrollerdb.txt).
 def gameDataDir = file("$rootDir/game-data")
 
+// Optional, for private builds only: -PlighthouseRomDir=<dir containing baserom.us.z64> bundles the
+// ROM so devices without a document picker (Steam Frame / Lepton) need no import step. Never publish
+// an APK built this way.
+def romOverride = project.findProperty('lighthouseRomDir')
+File romDir = null
+if (romOverride) {
+    romDir = new File(romOverride.toString().replaceFirst('^~', System.getProperty('user.home')))
+    if (!new File(romDir, 'baserom.us.z64').isFile()) {
+        throw new GradleException("lighthouseRomDir ${romDir} has no baserom.us.z64")
+    }
+}
+
 // Release signing key, kept outside the repo. Override the location with
 // -PlighthouseSigningProperties=/path/to/file. Without it, release builds use the debug key.
 def expandHome = { String path -> path.startsWith('~/') ? System.getProperty('user.home') + path.substring(1) : path }
@@ -60,6 +72,10 @@ android {
         versionCode 110
         versionName '1.1.0'
 
+        // -PlighthouseFrame: Steam Frame build (no touch pad, a pointer-clickable menu button,
+        // input logging for the Frame's controllers).
+        resValue 'bool', 'frame_build', project.hasProperty('lighthouseFrame') ? 'true' : 'false'
+
         ndk {
             // Override for emulator testing: ./gradlew assembleRelease -Pabis=x86_64
             abiFilters(*(project.findProperty('abis') ?: 'arm64-v8a').split(','))
@@ -99,7 +115,7 @@ android {
 
     sourceSets {
         main {
-            assets.srcDirs = [gameDataDir]
+            assets.srcDirs = romDir != null ? [gameDataDir, romDir] : [gameDataDir]
         }
     }
 
