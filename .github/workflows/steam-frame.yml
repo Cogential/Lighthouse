@@ -1,0 +1,109 @@
+name: Steam Frame
+
+# The Steam Frame (ARM64 Linux, SteamOS) build: lighthouse.o2r on x86-64 (Torch), then the game on an ARM64 runner
+# (Ubuntu 24.04: glibc 2.39, as SteamOS on the Frame) and steamframe/package.sh. No ROM is involved anywhere.
+# A tag frame-v* (or a manual run with release_tag) publishes a pre-release.
+on:
+  push:
+    tags: ["frame-v*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish a pre-release with this tag (e.g. frame-v0.1.0); empty builds only"
+        required: false
+        default: ""
+
+concurrency:
+  group: steam-frame-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  SDL2_VERSION: 2.30.12
+
+jobs:
+  o2r:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Generate lighthouse.o2r
+        run: |
+          sudo apt-get install -y -q ninja-build
+          VERSION=$(grep -oP '^\s*project\s*\([^)]*VERSION\s+\K[0-9\.]+' CMakeLists.txt)
+          make -C Torch type=release -j4
+          cp -r ./libultraship/src/fast/shaders ./port
+          Torch/cmake-build-release/torch pack port lighthouse.o2r o2r -u "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse.o2r
+          path: lighthouse.o2r
+          retention-days: 3
+
+  frame:
+    needs: o2r
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install the toolchain and libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q clang lld ninja-build cmake zip \
+            libsdl2-dev libsdl2-net-dev libpng-dev libzip-dev zipcmp zipmerge ziptool nlohmann-json3-dev \
+            libtinyxml2-dev libspdlog-dev libfmt-dev libboost-dev libgl-dev libopengl-dev libegl-dev \
+            libogg-dev libvorbis-dev zlib1g-dev libbz2-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libdrm-dev libgbm-dev \
+            libpulse-dev libasound2-dev libpipewire-0.3-dev libudev-dev libdbus-1-dev
+
+      # Ubuntu's libSDL2 links X11, Wayland, PulseAudio... directly; a source build loads them at run time.
+      - name: Build SDL2
+        run: |
+          curl -fsSL "https://github.com/libsdl-org/SDL/releases/download/release-$SDL2_VERSION/SDL2-$SDL2_VERSION.tar.gz" | tar -xz -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/SDL2-$SDL2_VERSION" -B "$RUNNER_TEMP/sdl2-build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF
+          ninja -C "$RUNNER_TEMP/sdl2-build"
+
+      - name: Build
+        run: |
+          cmake -S . -B build-frame -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCPU_OPTION=-march=armv8.2-a -DLIGHTHOUSE_SELF_CONTAINED=ON \
+            '-DCMAKE_BUILD_RPATH=$ORIGIN/lib' -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON
+          cmake --build build-frame --target Lighthouse
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: lighthouse.o2r
+          path: o2r
+
+      - name: Package
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gamecontrollerdb.txt" \
+            https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/master/gamecontrollerdb.txt
+          steamframe/package.sh build-frame o2r/lighthouse.o2r "$RUNNER_TEMP/sdl2-build/libSDL2-2.0.so.0" \
+            "$RUNNER_TEMP/gamecontrollerdb.txt" "$PWD/lighthouse-steam-frame-arm64.zip"
+          unzip -l lighthouse-steam-frame-arm64.zip | grep -v assets/
+          readelf -d build-frame/Lighthouse | grep -E 'NEEDED|RUNPATH|RPATH'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-steam-frame-arm64
+          path: lighthouse-steam-frame-arm64.zip
+          retention-days: 7
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/frame-v') || inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+        run: |
+          gh release create "$TAG" lighthouse-steam-frame-arm64.zip --prerelease --target "$GITHUB_SHA" \
+            --title "Lighthouse for Steam Frame $TAG" --notes-file steamframe/RELEASE_NOTES.md

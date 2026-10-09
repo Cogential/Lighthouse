@@ -305,13 +305,32 @@ static void PrepareSelfContainedHome() {
             std::filesystem::copy(exeDir / name, home / name, update, ec);
         }
     }
-    // Hand a bundled ROM to the extractor until it has built bk.o2r.
-    const std::filesystem::path rom = exeDir / "baserom.us.z64";
-    if (std::filesystem::exists(rom) && !std::filesystem::exists(home / "bk.o2r") &&
-        !std::filesystem::exists(home / "baserom.us.z64")) {
-        std::filesystem::copy_file(rom, home / "baserom.us.z64", ec);
+    // Hand a ROM to the extractor until it has built bk.o2r: one bundled with the package, or any .z64 the player
+    // put next to the executable or in the data folder, under the name the extractor looks for.
+    if (!std::filesystem::exists(home / "bk.o2r") && !std::filesystem::exists(home / "baserom.us.z64")) {
+        std::filesystem::path rom = exeDir / "baserom.us.z64";
+        for (const auto& dir : { exeDir, home }) {
+            if (std::filesystem::exists(rom)) {
+                break;
+            }
+            for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".z64") {
+                    rom = entry.path();
+                    break;
+                }
+            }
+        }
+        if (std::filesystem::exists(rom)) {
+            std::filesystem::copy_file(rom, home / "baserom.us.z64", ec);
+        }
     }
     setenv("SHIP_HOME", home.c_str(), 1);
+}
+
+// Steam describes its virtual Xbox pad as "Steam Frame Controllers" (28de:11e0), which SDL has no mapping for, so
+// only D-pad up, A and B would work. Without the description SDL sees an ordinary Xbox 360 pad.
+static void ForgetSteamPadDescription() {
+    unsetenv("SteamVirtualGamepadInfo");
 }
 #endif
 
@@ -326,6 +345,7 @@ int SDL_main(int argc, char* argv[]) {
 #endif
 
 #ifdef LIGHTHOUSE_SELF_CONTAINED
+    ForgetSteamPadDescription();
     PrepareSelfContainedHome();
 #endif
 
