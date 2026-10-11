@@ -4,6 +4,6 @@ Native ARM64 Linux build of [Lighthouse](https://github.com/IsleOPorts/Lighthous
 
 Download `lighthouse-steam-frame-arm64.zip`, unzip it into `~/devkit-game/<name>/` and point Steam at `run.sh` (no compatibility tool, or Steam Linux Runtime 4.0 arm64), or install it with Frametanium.
 
-**Controller fix:** Steam describes its virtual pad as "Steam Frame Controllers", which SDL has no mapping for, so only D-pad up, A and B worked. The game now ignores that description, so the whole controller works.
+**New in frame-v0.1.1:** removes frame-v0.1.0's D-pad change, which wasn't needed (binding the D-pad only failed while the headset's pointer was on).
 
 Built natively on GitHub's `ubuntu-24.04-arm` runner (glibc 2.39, as SteamOS on the Frame) for ARMv8.2.

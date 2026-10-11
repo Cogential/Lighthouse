@@ -326,12 +326,6 @@ static void PrepareSelfContainedHome() {
     }
     setenv("SHIP_HOME", home.c_str(), 1);
 }
-
-// Steam describes its virtual Xbox pad as "Steam Frame Controllers" (28de:11e0), which SDL has no mapping for, so
-// only D-pad up, A and B would work. Without the description SDL sees an ordinary Xbox 360 pad.
-static void ForgetSteamPadDescription() {
-    unsetenv("SteamVirtualGamepadInfo");
-}
 #endif
 
 /* Rename SDL_main to main for SDL compatibility */
@@ -345,7 +339,6 @@ int SDL_main(int argc, char* argv[]) {
 #endif
 
 #ifdef LIGHTHOUSE_SELF_CONTAINED
-    ForgetSteamPadDescription();
     PrepareSelfContainedHome();
 #endif
 
